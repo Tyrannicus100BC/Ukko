@@ -32,7 +32,8 @@ from typing import Optional
 
 from . import capabilities, cognition, sleep as sleep_mod
 from .config import Config
-from .llm import LLMError, Ollama
+from .llm import LLMError, make_llm
+from .attention import Attention
 from .sensors import ClockSensor, InboxSensor, WatchSensor
 from .store import MemoryStore
 
@@ -43,8 +44,7 @@ class Mind:
     def __init__(self, cfg: Config):
         self.cfg = cfg
         cfg.ensure_dirs()
-        self.llm = Ollama(cfg.ollama_url, cfg.model, cfg.embed_model,
-                          cfg.llm_timeout_s)
+        self.llm = make_llm(cfg)
         self.store = MemoryStore(cfg.db_path, self.llm.embed)
         self.sensors = [
             InboxSensor(cfg.inbox_dir),
@@ -64,6 +64,8 @@ class Mind:
         self.last_thought = ""
         self.repeat_streak = 0
         self.recent_user_texts: list[str] = []  # echo-check window
+        self.attention = Attention(self.store, cfg) if cfg.experimental_attention else None
+        self.last_attention: dict = {}
 
         # user-granted powers (via UI -> runtime/settings.json, hot-reloaded)
         self.allow_browse = False
@@ -77,8 +79,11 @@ class Mind:
         self._force_sleep = False
 
         if not self.store.get_self_model()[0]:
-            self.store.set_self_model(BOOT_SELF_MODEL.format(
-                name=cfg.agent_name, user=cfg.user_name))
+            initial = ("I am {name}, a persistent local process. I can observe my environment, "
+                       "develop questions, revise memories and choose when to communicate with {user}. "
+                       "My initial interests are experimental starting conditions."
+                       if cfg.experimental_attention else BOOT_SELF_MODEL)
+            self.store.set_self_model(initial.format(name=cfg.agent_name, user=cfg.user_name))
             self.journal("birth", {"text": "First boot. Self-model initialized."})
         else:
             self.journal("reboot", {"text": "Process restarted; memory intact."})
@@ -92,6 +97,22 @@ class Mind:
                     self.last_dream = dreams[-1]
             except json.JSONDecodeError:
                 pass
+        if self.attention:
+            raw = self.store.get_meta("ukko_checkpoint")
+            if raw:
+                snapshot = json.loads(raw)
+                for key in ("focus", "fatigue", "tick_count", "woke_ts", "last_user_ts",
+                            "last_spoke_ts", "working_memory", "recent_user_texts",
+                            "last_thought", "repeat_streak"):
+                    if key in snapshot:
+                        setattr(self, key, snapshot[key])
+
+    def checkpoint(self) -> None:
+        if self.attention:
+            keys = ("focus", "fatigue", "tick_count", "woke_ts", "last_user_ts",
+                    "last_spoke_ts", "working_memory", "recent_user_texts",
+                    "last_thought", "repeat_streak")
+            self.store.set_meta("ukko_checkpoint", json.dumps({k: getattr(self, k) for k in keys}))
 
     # ------------------------------------------------------------------
     def journal(self, kind: str, data: dict) -> None:
@@ -109,7 +130,7 @@ class Mind:
         self.working_memory.append(f"I said: {text}")
         self.last_spoke_ts = time.time()
         self.store.remember("episodic", f"I said to {self.cfg.user_name}: {text}",
-                            importance=0.35, source="self.speech")
+                            importance=0.35, source="self.speech", epistemic="observation")
 
     def write_state(self, phase: str) -> None:
         state = {
@@ -120,8 +141,12 @@ class Mind:
             "focus": self.focus,
             "memory": self.store.stats(),
             "pid": os.getpid(),
+            "inference_backend": self.cfg.inference_backend,
+            "attention": self.last_attention,
         }
-        self.cfg.state_path.write_text(json.dumps(state, indent=2))
+        tmp = self.cfg.state_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(state, indent=2))
+        tmp.replace(self.cfg.state_path)
 
     # ------------------------------------------------------------------
     @property
@@ -201,6 +226,10 @@ class Mind:
     def tick(self) -> None:
         self._load_ui_settings()
         percepts = self.perceive()
+        if self._stop:
+            return
+        if self.attention:
+            self.attention.add_percepts(percepts)
         user_spoke = any(p["source"] == "user" for p in percepts)
         if user_spoke:
             self.last_user_ts = time.time()
@@ -218,7 +247,7 @@ class Mind:
         # from a small pointed prompt. This runs BEFORE the percept is encoded,
         # so the question cannot be retrieved as a "memory" and parroted back.
         # reply() echo-guards itself (against user words AND its own memories).
-        if user_texts:
+        if user_texts and not self.attention:
             answer, echoed = cognition.reply(
                 self.cfg, self.llm, self.store, user_texts,
                 self.working_memory, self.recent_user_texts)
@@ -235,11 +264,11 @@ class Mind:
             if p["source"] == "user":
                 self.store.remember(
                     "episodic", f"{self.cfg.user_name} said: {p['text']}",
-                    importance=0.55, source="user")
+                    importance=0.55, source="user", epistemic="observation")
             elif p["importance"] >= 0.45:
                 self.store.remember("episodic", p["text"],
                                     importance=p["importance"],
-                                    source=p["source"])
+                                    source=p["source"], epistemic="observation")
             self.working_memory.append(f"({p['source']}) {p['text']}")
 
         # slow path — the contemplative tick: inner monologue and actions
@@ -247,13 +276,35 @@ class Mind:
             a for a, on in (("browse", self.allow_browse),
                             ("files", self.allow_files and self.workspace_dir))
             if on)
+        candidates, selected = [], None
+        selector, reason, choice_metrics = "", "", {}
+        if self.attention:
+            candidates = self.attention.shortlist()
+            self.llm.last_generation = {}
+            selected, selector, reason = cognition.choose_attention(self.llm, candidates)
+            choice_metrics = dict(self.llm.last_generation)
+            self.focus = selected.text
         situation = cognition.build_situation(
             self.cfg, self.store, working_memory=self.working_memory,
             percepts=percepts, focus=self.focus,
             sleep_pressure=self.sleep_pressure, last_dream=self.last_dream,
             stuck=self.repeat_streak >= 2, abilities=abilities)
+        if selected:
+            situation += (f"\n\nSELECTED ATTENTION: #{selected.id} [{selected.kind}] {selected.text}"
+                          f"\nSelection reason: {reason}")
+        self.llm.last_generation = {}
         result = cognition.think(self.cfg, self.llm, situation, abilities)
-        if user_texts:
+        if selected:
+            receipt = self.attention.record(
+                candidates, selected, selector=selector, reason=reason,
+                thought_completed=bool(result.thought) and not result.error,
+                metrics={"selection": choice_metrics, "thought": dict(self.llm.last_generation),
+                         "error": result.error})
+            self.last_attention = receipt
+            self.journal("attention.choice", receipt)
+        if result.error:
+            self.journal("generation.error", {"text": result.error})
+        if user_texts and not self.attention:
             result.say = None  # the reflex already answered; don't double-speak
         elif result.say and self._is_echo(result.say, self.recent_user_texts):
             result.say = None
@@ -261,7 +312,7 @@ class Mind:
 
         self.tick_count += 1
         self.fatigue += self.cfg.fatigue_per_tick
-        if result.focus:
+        if result.focus and not self.attention:
             self.focus = result.focus
         if result.thought:
             if self._norm(result.thought) == self._norm(self.last_thought):
@@ -282,12 +333,26 @@ class Mind:
         if result.remember and not self._is_echo(result.remember,
                                                  self.recent_user_texts):
             self.store.remember("semantic", result.remember,
-                                importance=0.55, source="self.deliberate")
+                                importance=0.55, source="self.deliberate", epistemic="hypothesis")
             self.journal("remember", {"text": result.remember})
         if result.new_goal and not self._is_echo(result.new_goal,
                                                  self.recent_user_texts):
-            self.store.add_goal(result.new_goal)
+            goal_id = self.store.add_goal(result.new_goal)
+            if self.attention:
+                self.attention.add_interest(result.new_goal, source=f"goal:{goal_id}")
             self.journal("goal", {"text": result.new_goal})
+        if self.attention:
+            if result.new_interest:
+                interest_id = self.attention.add_interest(result.new_interest)
+                self.journal("attention.interest", {"id": interest_id, "text": result.new_interest,
+                                                    "accepted": interest_id is not None})
+            if selected and result.resolved_interest == selected.id:
+                if self.attention.resolve(selected.id):
+                    if selected.source.startswith("goal:"):
+                        self.store.complete_goal(int(selected.source.split(":")[1]))
+                    self.journal("attention.resolved", {"id": selected.id})
+            if result.request_sleep:
+                self._force_sleep = True
 
         # granted powers — throttled, bounded, and journaled
         if result.browse and "browse" in abilities and \
@@ -303,7 +368,7 @@ class Mind:
                 self.journal("browse", {"url": result.browse, "error": str(e)})
             self.working_memory.append(note)
             self.store.remember("episodic", note[:1200], importance=0.5,
-                                source="self.browse")
+                                source="self.browse", epistemic="observation")
         if result.file_name and result.file_content and "files" in abilities \
                 and time.time() - self.last_file_ts >= 60:
             self.last_file_ts = time.time()
@@ -318,7 +383,7 @@ class Mind:
                 self.store.remember(
                     "episodic", f"I created the file {path.name} in my"
                     f" workspace. It contains: {result.file_content[:200]}",
-                    importance=0.5, source="self.file")
+                    importance=0.5, source="self.file", epistemic="observation")
             except (ValueError, OSError) as e:
                 self.journal("file", {"error": str(e)})
 
@@ -328,6 +393,7 @@ class Mind:
         else:
             self.tick_interval = min(self.cfg.tick_max_s,
                                      self.tick_interval * self.cfg.tick_backoff)
+        self.checkpoint()
 
     # ------------------------------------------------------------------
     def maybe_sleep(self) -> bool:
@@ -382,12 +448,14 @@ class Mind:
         self.working_memory.append(f"I just woke from sleep: {summary}.")
         if rep.dreams:
             self.working_memory.append(f"I dreamed: {rep.dreams[-1]}")
+        self.checkpoint()
 
     # ------------------------------------------------------------------
     def run(self, max_ticks: int = 0, max_seconds: float = 0.0) -> None:
         signal.signal(signal.SIGTERM, lambda *_: setattr(self, "_stop", True))
         signal.signal(signal.SIGINT, lambda *_: setattr(self, "_stop", True))
         start = time.time()
+        start_ticks = self.tick_count
         self.journal("awake", {"text": f"{self.cfg.agent_name} is awake.",
                                "model": self.cfg.model})
         self.write_state("awake")
@@ -397,10 +465,12 @@ class Mind:
             except LLMError as e:
                 self.journal("error", {"text": str(e)})
                 time.sleep(5.0)
+            if self._stop:
+                break
             if self.maybe_sleep():
                 self.do_sleep()
             self.write_state("awake")
-            if max_ticks and self.tick_count >= max_ticks:
+            if max_ticks and self.tick_count - start_ticks >= max_ticks:
                 break
             if max_seconds and time.time() - start >= max_seconds:
                 break

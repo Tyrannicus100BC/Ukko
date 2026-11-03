@@ -1,0 +1,19 @@
+{
+  "agent_name": "Ukko",
+  "user_name": "Human",
+  "experimental_attention": true,
+  "inference_backend": "ollama",
+  "model": "qwen3.8:latest",
+  "embed_model": "nomic-embed-text",
+  "keep_alive": "-1",
+  "think": false,
+  "context_tokens": 8192,
+  "max_thought_tokens": 500,
+  "tick_base_s": 1.0,
+  "tick_max_s": 5.0,
+  "tick_backoff": 1.05,
+  "attention_slots": 6,
+  "attention_age_s": 600.0,
+  "fatigue_sleep_threshold": 120.0,
+  "purge_archive_days": 1000000.0
+}

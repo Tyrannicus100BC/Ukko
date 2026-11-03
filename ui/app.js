@@ -219,6 +219,14 @@ function routeEntry(e, live) {
   } else if (kind === "thought") {
     addMind("thought", e.text, ts);
     if (live) flashAvatar("thinking");
+  } else if (kind === "attention.choice") {
+    const selected = (e.shortlist || []).find(x => x.id === e.selected_id);
+    addMind("attention", (selected ? selected.text : "Selected topic") +
+      " — " + (e.reason || "") + (e.selector === "controller_fallback" ? " (fallback)" : ""), ts);
+  } else if (kind === "attention.interest") {
+    addMind("question", e.text || "", ts);
+  } else if (kind === "generation.error") {
+    addMind("generation failed", e.text || "", ts);
   } else if (kind === "sleep.dream") {
     addMind("dream", e.dream || e.text || "", ts);
   } else if (kind === "browse") {
@@ -510,6 +518,7 @@ async function loadMemories() {
     card.querySelector(".k").textContent = x.kind;
     card.querySelector(".body").textContent = x.text;
     card.querySelector(".bars").textContent =
+      `${x.epistemic || "unclassified"} · ${x.source || "unknown source"} · ` +
       `imp ${x.importance.toFixed(2)} · str ${x.strength.toFixed(2)} · ×${x.access_count}`;
     log.appendChild(card);
   });

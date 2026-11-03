@@ -43,7 +43,8 @@ else:
 UI_DIR = Path(__file__).resolve().parent.parent / "ui"
 CHAT_KINDS = ("say", "percept", "message", "thought", "sleep.begin",
               "sleep.end", "sleep.dream", "remember", "goal", "browse",
-              "file", "grant", "awake", "reboot", "birth", "control")
+              "file", "grant", "awake", "reboot", "birth", "control",
+              "attention.choice", "attention.interest", "attention.resolved", "generation.error")
 
 DEFAULT_SETTINGS = {
     "agent_name": "Anima",
@@ -74,6 +75,7 @@ class Api:
     # -- settings ---------------------------------------------------------
     def settings(self) -> dict:
         s = dict(DEFAULT_SETTINGS)
+        s.update(agent_name=self.cfg.agent_name, user_name=self.cfg.user_name)
         try:
             s.update(json.loads(self.settings_path.read_text()))
         except (OSError, json.JSONDecodeError):
@@ -99,8 +101,9 @@ class Api:
         try:
             st = json.loads(self.cfg.state_path.read_text())
             st["state_age_s"] = round(time.time() - st.get("ts", 0), 1)
-            st["daemon_alive"] = st["state_age_s"] < max(
-                600.0, self.cfg.tick_max_s * 2)
+            st["daemon_alive"] = (st.get("phase") != "stopped" and
+                                  st["state_age_s"] < max(
+                                      600.0, self.cfg.tick_max_s * 2))
             return st
         except (OSError, json.JSONDecodeError):
             return {"phase": "not running", "daemon_alive": False}
@@ -132,7 +135,7 @@ class Api:
         except sqlite3.Error:
             return []
         q = ("SELECT id, kind, text, importance, strength, access_count,"
-             " created_ts, source FROM memories WHERE archived_ts IS NULL")
+             " created_ts, source, epistemic FROM memories WHERE archived_ts IS NULL")
         args: list = []
         if kind:
             q += " AND kind=?"

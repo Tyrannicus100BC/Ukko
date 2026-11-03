@@ -22,6 +22,19 @@ class Config:
     llm_timeout_s: float = 180.0
     max_thought_tokens: int = 220
     temperature: float = 0.8
+    inference_backend: str = "ollama"  # "local_http" for an MLX-compatible server
+    inference_url: str = "http://127.0.0.1:8080/v1"
+    keep_alive: str = "-1"
+    context_tokens: int = 8192
+    think: bool = False               # Ollama reasoning mode; JSON cycles stay bounded
+
+    # --- experimental attention (opt in; upstream behavior remains available) ---
+    experimental_attention: bool = False
+    attention_slots: int = 6
+    attention_age_s: float = 600.0
+    attention_age_weight: float = 0.8
+    attention_cooldown_s: float = 60.0
+    attention_max_interests: int = 64
 
     # --- filesystem ------------------------------------------------------
     runtime_dir: str = ""              # resolved in load(); holds db, journal, inbox, outbox
@@ -120,7 +133,12 @@ def load(path: str | None = None) -> Config:
         if env is not None:
             cast = f.type if isinstance(f.type, type) else type(getattr(cfg, f.name))
             try:
-                setattr(cfg, f.name, cast(env) if cast is not str else env)
+                if cast is bool:
+                    if env.lower() not in ("true", "false", "1", "0"):
+                        raise ValueError(f"{f.name} must be true/false or 1/0")
+                    setattr(cfg, f.name, env.lower() in ("true", "1"))
+                else:
+                    setattr(cfg, f.name, cast(env) if cast is not str else env)
             except (TypeError, ValueError):
-                setattr(cfg, f.name, env)
+                raise ValueError(f"invalid configuration value for {f.name}") from None
     return cfg

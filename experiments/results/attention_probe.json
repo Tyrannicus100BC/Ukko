@@ -1,0 +1,24 @@
+{
+  "experiment": "attention_age_ablation",
+  "model_calls": 0,
+  "claim": "Controller behavior under synthetic event pressure only",
+  "without_aging": {
+    "age_weight": 0.0,
+    "steps": 720,
+    "selected_by_kind": {
+      "event": 720
+    },
+    "interests_attended": 0,
+    "total_interests": 19
+  },
+  "with_aging": {
+    "age_weight": 0.8,
+    "steps": 720,
+    "selected_by_kind": {
+      "event": 666,
+      "interest": 54
+    },
+    "interests_attended": 19,
+    "total_interests": 19
+  }
+}

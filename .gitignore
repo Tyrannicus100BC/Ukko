@@ -1,5 +1,27 @@
-runtime/
-tests/_itest_runtime/
+# Local agent state and raw experiment runs
+/runtime/
+/tests/_itest_runtime/
+/experiments/runs/
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+
+# Local reference checkouts
+/.references/
+
+# Python environments, bytecode, and test output
+.venv/
 __pycache__/
-*.pyc
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local environment settings
+.env
+.env.*
+!.env.example
+
+# macOS metadata
 .DS_Store

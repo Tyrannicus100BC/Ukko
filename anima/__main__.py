@@ -30,10 +30,10 @@ def _drop_inbox(cfg, text: str, kind: str = "message") -> None:
 
 def cmd_run(cfg, args) -> None:
     from .agent import Mind
-    from .llm import Ollama
-    llm = Ollama(cfg.ollama_url, cfg.model)
+    from .llm import make_llm
+    llm = make_llm(cfg)
     if not llm.alive():
-        print(f"error: no Ollama server at {cfg.ollama_url}", file=sys.stderr)
+        print(f"error: no {cfg.inference_backend} inference server", file=sys.stderr)
         sys.exit(1)
     mind = Mind(cfg)
     print(f"{cfg.agent_name} is awake (model={cfg.model}, "
@@ -118,7 +118,7 @@ def cmd_status(cfg, args) -> None:
         state = json.loads(cfg.state_path.read_text())
         age = time.time() - state.get("ts", 0)
         state["state_age_s"] = round(age, 1)
-        state["daemon_looks_alive"] = age < 600
+        state["daemon_looks_alive"] = state.get("phase") != "stopped" and age < 600
         print(json.dumps(state, indent=2))
     else:
         print("no state file — the mind has never run here.")
@@ -153,7 +153,7 @@ def cmd_memories(cfg, args) -> None:
     params.append(args.limit)
     for r in store.db.execute(q, params):
         flag = " [ARCHIVED]" if r["archived_ts"] else ""
-        print(f"#{r['id']} {r['kind']:<10} imp={r['importance']:.2f} "
+        print(f"#{r['id']} {r['kind']:<10} [{r['epistemic']}; {r['source']}] imp={r['importance']:.2f} "
               f"str={r['strength']:.2f} acc={r['access_count']}{flag}\n"
               f"   {r['text'][:180]}")
     print("\nstats:", json.dumps(store.stats()))
@@ -164,6 +164,14 @@ def cmd_self(cfg, args) -> None:
     store = _open_store(cfg)
     text, version = store.get_self_model()
     print(f"self-model v{version}:\n\n{text or '(none)'}")
+    store.close()
+
+
+def cmd_attention(cfg, args) -> None:
+    from .attention import Attention
+    store = _open_store(cfg)
+    attention = Attention(store, cfg)
+    print(json.dumps([c.to_dict() for c in attention.shortlist()], indent=2))
     store.close()
 
 
@@ -195,7 +203,7 @@ def main() -> None:
     p.set_defaults(fn=cmd_control)
 
     for name, fn in (("status", cmd_status), ("dreams", cmd_dreams),
-                     ("self", cmd_self)):
+                     ("self", cmd_self), ("attention", cmd_attention)):
         p = sub.add_parser(name)
         p.set_defaults(fn=fn)
 

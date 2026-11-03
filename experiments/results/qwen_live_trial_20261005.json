@@ -1,0 +1,572 @@
+{
+  "model": "qwen3.8:latest",
+  "model_digest": "aaee06c39dcf2437cde036998d960e1fc1494b8191be7cc9657d01e509097813",
+  "runtime": "runtime/trials/qwen-20261005-153133",
+  "episodes": [
+    {
+      "started_ts": 1791239512.0774798,
+      "decisions": 0,
+      "errors": 4,
+      "stopped_ts": 1791239535.1790981,
+      "checkpoint_tick": 0
+    },
+    {
+      "started_ts": 1791239564.712626,
+      "decisions": 9,
+      "errors": 0,
+      "stopped_ts": 1791240245.2995389,
+      "checkpoint_tick": 9
+    },
+    {
+      "started_ts": 1791240264.568095,
+      "decisions": 1,
+      "errors": 0,
+      "stopped_ts": 1791240348.4469728,
+      "checkpoint_tick": 10
+    }
+  ],
+  "cycles": [
+    {
+      "ts": 1791239603.229845,
+      "selected_id": 2,
+      "selector": "model",
+      "selected_top_rank": true,
+      "selected_kind": "interest",
+      "thought_completed": true,
+      "selection": {
+        "backend": "ollama",
+        "model": "qwen3.8:latest",
+        "wall_s": 8.29726349998964,
+        "prompt_tokens": 574,
+        "completion_tokens": 30,
+        "json_attempts": [
+          {
+            "backend": "ollama",
+            "model": "qwen3.8:latest",
+            "wall_s": 8.29726349998964,
+            "prompt_tokens": 574,
+            "completion_tokens": 30,
+            "parsed": true
+          }
+        ]
+      },
+      "thought": {
+        "backend": "ollama",
+        "model": "qwen3.8:latest",
+        "wall_s": 30.054152583004907,
+        "prompt_tokens": 424,
+        "completion_tokens": 274,
+        "json_attempts": [
+          {
+            "backend": "ollama",
+            "model": "qwen3.8:latest",
+            "wall_s": 30.054152583004907,
+            "prompt_tokens": 424,
+            "completion_tokens": 274,
+            "parsed": true
+          }
+        ]
+      },
+      "generation_wall_s": 38.35141608299455
+    },
+    {
+      "ts": 1791239648.456544,
+      "selected_id": 3,
+      "selector": "model",
+      "selected_top_rank": true,
+      "selected_kind": "interest",
+      "thought_completed": true,
+      "selection": {
+        "backend": "ollama",
+        "model": "qwen3.8:latest",
+        "wall_s": 9.04458070898545,
+        "prompt_tokens": 713,
+        "completion_tokens": 32,
+        "json_attempts": [
+          {
+            "backend": "ollama",
+            "model": "qwen3.8:latest",
+            "wall_s": 9.04458070898545,
+            "prompt_tokens": 713,
+            "completion_tokens": 32,
+            "parsed": true
+          }
+        ]
+      },
+      "thought": {
+        "backend": "ollama",
+        "model": "qwen3.8:latest",
+        "wall_s": 34.58776029100409,
+        "prompt_tokens": 649,
+        "completion_tokens": 264,
+        "json_attempts": [
+          {
+            "backend": "ollama",
+            "model": "qwen3.8:latest",
+            "wall_s": 34.58776029100409,
+            "prompt_tokens": 649,
+            "completion_tokens": 264,
+            "parsed": true
+          }
+        ]
+      },
+      "generation_wall_s": 43.63234099998954
+    },
+    {
+      "ts": 1791239697.6653829,
+      "selected_id": 4,
+      "selector": "model",
+      "selected_top_rank": true,
+      "selected_kind": "interest",
+      "thought_completed": true,
+      "selection": {
+        "backend": "ollama",
+        "model": "qwen3.8:latest",
+        "wall_s": 11.103739708982175,
+        "prompt_tokens": 852,
+        "completion_tokens": 41,
+        "json_attempts": [
+          {
+            "backend": "ollama",
+            "model": "qwen3.8:latest",
+            "wall_s": 11.103739708982175,
+            "prompt_tokens": 852,
+            "completion_tokens": 41,
+            "parsed": true
+          }
+        ]
+      },
+      "thought": {
+        "backend": "ollama",
+        "model": "qwen3.8:latest",
+        "wall_s": 36.66802741700667,
+        "prompt_tokens": 879,
+        "completion_tokens": 281,
+        "json_attempts": [
+          {
+            "backend": "ollama",
+            "model": "qwen3.8:latest",
+            "wall_s": 36.66802741700667,
+            "prompt_tokens": 879,
+            "completion_tokens": 281,
+            "parsed": true
+          }
+        ]
+      },
+      "generation_wall_s": 47.771767125988845
+    },
+    {
+      "ts": 1791239752.857821,
+      "selected_id": 6,
+      "selector": "model",
+      "selected_top_rank": true,
+      "selected_kind": "interest",
+      "thought_completed": true,
+      "selection": {
+        "backend": "ollama",
+        "model": "qwen3.8:latest",
+        "wall_s": 12.97692683301284,
+        "prompt_tokens": 851,
+        "completion_tokens": 54,
+        "json_attempts": [
+          {
+            "backend": "ollama",
+            "model": "qwen3.8:latest",
+            "wall_s": 12.97692683301284,
+            "prompt_tokens": 851,
+            "completion_tokens": 54,
+            "parsed": true
+          }
+        ]
+      },
+      "thought": {
+        "backend": "ollama",
+        "model": "qwen3.8:latest",
+        "wall_s": 40.501006125006825,
+        "prompt_tokens": 1131,
+        "completion_tokens": 328,
+        "json_attempts": [
+          {
+            "backend": "ollama",
+            "model": "qwen3.8:latest",
+            "wall_s": 40.501006125006825,
+            "prompt_tokens": 1131,
+            "completion_tokens": 328,
+            "parsed": true
+          }
+        ]
+      },
+      "generation_wall_s": 53.477932958019665
+    },
+    {
+      "ts": 1791239841.875627,
+      "selected_id": 7,
+      "selector": "model",
+      "selected_top_rank": true,
+      "selected_kind": "interest",
+      "thought_completed": true,
+      "selection": {
+        "backend": "ollama",
+        "model": "qwen3.8:latest",
+        "wall_s": 12.459687084017787,
+        "prompt_tokens": 880,
+        "completion_tokens": 38,
+        "json_attempts": [
+          {
+            "backend": "ollama",
+            "model": "qwen3.8:latest",
+            "wall_s": 12.459687084017787,
+            "prompt_tokens": 880,
+            "completion_tokens": 38,
+            "parsed": true
+          }
+        ]
+      },
+      "thought": {
+        "backend": "ollama",
+        "model": "qwen3.8:latest",
+        "wall_s": 76.27824812498875,
+        "prompt_tokens": 1456,
+        "completion_tokens": 451,
+        "json_attempts": [
+          {
+            "backend": "ollama",
+            "model": "qwen3.8:latest",
+            "wall_s": 76.27824812498875,
+            "prompt_tokens": 1456,
+            "completion_tokens": 451,
+            "parsed": true
+          }
+        ]
+      },
+      "generation_wall_s": 88.73793520900654
+    },
+    {
+      "ts": 1791239937.89231,
+      "selected_id": 9,
+      "selector": "model",
+      "selected_top_rank": true,
+      "selected_kind": "event",
+      "thought_completed": true,
+      "selection": {
+        "backend": "ollama",
+        "model": "qwen3.8:latest",
+        "wall_s": 16.138854209013516,
+        "prompt_tokens": 890,
+        "completion_tokens": 28,
+        "json_attempts": [
+          {
+            "backend": "ollama",
+            "model": "qwen3.8:latest",
+            "wall_s": 16.138854209013516,
+            "prompt_tokens": 890,
+            "completion_tokens": 28,
+            "parsed": true
+          }
+        ]
+      },
+      "thought": {
+        "backend": "ollama",
+        "model": "qwen3.8:latest",
+        "wall_s": 78.6154916670057,
+        "prompt_tokens": 1822,
+        "completion_tokens": 367,
+        "json_attempts": [
+          {
+            "backend": "ollama",
+            "model": "qwen3.8:latest",
+            "wall_s": 78.6154916670057,
+            "prompt_tokens": 1822,
+            "completion_tokens": 367,
+            "parsed": true
+          }
+        ]
+      },
+      "generation_wall_s": 94.75434587601922
+    },
+    {
+      "ts": 1791240049.57986,
+      "selected_id": 8,
+      "selector": "model",
+      "selected_top_rank": true,
+      "selected_kind": "interest",
+      "thought_completed": true,
+      "selection": {
+        "backend": "ollama",
+        "model": "qwen3.8:latest",
+        "wall_s": 16.897461542015662,
+        "prompt_tokens": 902,
+        "completion_tokens": 38,
+        "json_attempts": [
+          {
+            "backend": "ollama",
+            "model": "qwen3.8:latest",
+            "wall_s": 16.897461542015662,
+            "prompt_tokens": 902,
+            "completion_tokens": 38,
+            "parsed": true
+          }
+        ]
+      },
+      "thought": {
+        "backend": "ollama",
+        "model": "qwen3.8:latest",
+        "wall_s": 93.28407383299782,
+        "prompt_tokens": 2046,
+        "completion_tokens": 436,
+        "json_attempts": [
+          {
+            "backend": "ollama",
+            "model": "qwen3.8:latest",
+            "wall_s": 93.28407383299782,
+            "prompt_tokens": 2046,
+            "completion_tokens": 436,
+            "parsed": true
+          }
+        ]
+      },
+      "generation_wall_s": 110.18153537501348
+    },
+    {
+      "ts": 1791240133.837118,
+      "selected_id": 10,
+      "selector": "model",
+      "selected_top_rank": true,
+      "selected_kind": "interest",
+      "thought_completed": true,
+      "selection": {
+        "backend": "ollama",
+        "model": "qwen3.8:latest",
+        "wall_s": 15.427245292026782,
+        "prompt_tokens": 922,
+        "completion_tokens": 49,
+        "json_attempts": [
+          {
+            "backend": "ollama",
+            "model": "qwen3.8:latest",
+            "wall_s": 15.427245292026782,
+            "prompt_tokens": 922,
+            "completion_tokens": 49,
+            "parsed": true
+          }
+        ]
+      },
+      "thought": {
+        "backend": "ollama",
+        "model": "qwen3.8:latest",
+        "wall_s": 67.29816545799258,
+        "prompt_tokens": 2366,
+        "completion_tokens": 299,
+        "json_attempts": [
+          {
+            "backend": "ollama",
+            "model": "qwen3.8:latest",
+            "wall_s": 67.29816545799258,
+            "prompt_tokens": 2366,
+            "completion_tokens": 299,
+            "parsed": true
+          }
+        ]
+      },
+      "generation_wall_s": 82.72541075001936
+    },
+    {
+      "ts": 1791240245.175763,
+      "selected_id": 11,
+      "selector": "model",
+      "selected_top_rank": true,
+      "selected_kind": "interest",
+      "thought_completed": true,
+      "selection": {
+        "backend": "ollama",
+        "model": "qwen3.8:latest",
+        "wall_s": 15.346077625028556,
+        "prompt_tokens": 905,
+        "completion_tokens": 44,
+        "json_attempts": [
+          {
+            "backend": "ollama",
+            "model": "qwen3.8:latest",
+            "wall_s": 15.346077625028556,
+            "prompt_tokens": 905,
+            "completion_tokens": 44,
+            "parsed": true
+          }
+        ]
+      },
+      "thought": {
+        "backend": "ollama",
+        "model": "qwen3.8:latest",
+        "wall_s": 95.78800400000182,
+        "prompt_tokens": 2608,
+        "completion_tokens": 474,
+        "json_attempts": [
+          {
+            "backend": "ollama",
+            "model": "qwen3.8:latest",
+            "wall_s": 95.78800400000182,
+            "prompt_tokens": 2608,
+            "completion_tokens": 474,
+            "parsed": true
+          }
+        ]
+      },
+      "generation_wall_s": 111.13408162503038
+    },
+    {
+      "ts": 1791240348.309675,
+      "selected_id": 15,
+      "selector": "model",
+      "selected_top_rank": false,
+      "selected_kind": "event",
+      "thought_completed": true,
+      "selection": {
+        "backend": "ollama",
+        "model": "qwen3.8:latest",
+        "wall_s": 17.645080625021365,
+        "prompt_tokens": 893,
+        "completion_tokens": 57,
+        "json_attempts": [
+          {
+            "backend": "ollama",
+            "model": "qwen3.8:latest",
+            "wall_s": 17.645080625021365,
+            "prompt_tokens": 893,
+            "completion_tokens": 57,
+            "parsed": true
+          }
+        ]
+      },
+      "thought": {
+        "backend": "ollama",
+        "model": "qwen3.8:latest",
+        "wall_s": 65.97345566700096,
+        "prompt_tokens": 2816,
+        "completion_tokens": 284,
+        "json_attempts": [
+          {
+            "backend": "ollama",
+            "model": "qwen3.8:latest",
+            "wall_s": 65.97345566700096,
+            "prompt_tokens": 2816,
+            "completion_tokens": 284,
+            "parsed": true
+          }
+        ]
+      },
+      "generation_wall_s": 83.61853629202233
+    }
+  ],
+  "counts": {
+    "birth": 1,
+    "awake": 3,
+    "error": 4,
+    "control": 1,
+    "shutdown": 3,
+    "reboot": 2,
+    "attention.choice": 10,
+    "thought": 10,
+    "remember": 10,
+    "attention.interest": 6,
+    "goal": 2,
+    "percept": 2,
+    "say": 2
+  },
+  "completed_thoughts": 10,
+  "selection_fallbacks": 0,
+  "top_rank_choices": 9,
+  "json_attempts": 20,
+  "accepted_json_attempts": 20,
+  "parse_measure": "Accepted by the existing lenient parser; strict JSON and truncation are not separately measured",
+  "generation_wall_s": {
+    "n": 10,
+    "min": 38.35141608299455,
+    "median": 83.17197352102085,
+    "max": 111.13408162503038
+  },
+  "memory_groups": [
+    {
+      "kind": "episodic",
+      "source": "self.speech",
+      "epistemic": "observation",
+      "count": 2
+    },
+    {
+      "kind": "episodic",
+      "source": "user",
+      "epistemic": "observation",
+      "count": 2
+    },
+    {
+      "kind": "semantic",
+      "source": "self.deliberate",
+      "epistemic": "hypothesis",
+      "count": 10
+    }
+  ],
+  "attention_groups": [
+    {
+      "kind": "background",
+      "status": "active",
+      "count": 1
+    },
+    {
+      "kind": "event",
+      "status": "attended",
+      "count": 2
+    },
+    {
+      "kind": "interest",
+      "status": "active",
+      "count": 11
+    }
+  ],
+  "database_quick_check": "ok",
+  "stored_embedding_groups": [
+    {
+      "bytes_per_vector": 3072,
+      "count": 14
+    }
+  ],
+  "memories_recalled": 13,
+  "startup_issue": {
+    "cause": "keep_alive string -1 rejected as a duration with no unit",
+    "correction": "Serialize negative keep_alive as the JSON number -1",
+    "completed_cycles_before_correction": 0
+  },
+  "restart_check": {
+    "time": 1791240264.565439,
+    "start_tick": 9,
+    "working_memory_entries": 13,
+    "memory_count": 13,
+    "checks": {
+      "focus": true,
+      "fatigue": true,
+      "tick_count": true,
+      "woke_ts": true,
+      "last_user_ts": true,
+      "last_spoke_ts": true,
+      "working_memory": true,
+      "recent_user_texts": true,
+      "last_thought": true,
+      "repeat_streak": true,
+      "memory_ids_preserved": true,
+      "candidate_state_preserved": true
+    },
+    "scope": "One completed-cycle restart; no new synthetic input; not an arbitrary crash or isolated recall experiment",
+    "loaded_source_hashes": {
+      "anima/store.py": "a0212b6f5ee5f7d2dd270a251455ad2f7202675dea0e90b985a1134179cfd337",
+      "anima/attention.py": "64b5c8fe4ccb7eeb5580e2f8a62d96ccec681d4d0f2635b4719417ecc843fb79",
+      "anima/server.py": "9fc5da5972ade8e7137cbcc1424ba84e0a3dcfe5fe36325f377b3cee9c667d0a",
+      "anima/config.py": "f47fa227a43e342325477a8fb3c4f14a0eca875b0624654ce7361589f7d5f977",
+      "anima/sensors.py": "4089f19d1f4dcb42435debbd082b25a030b181df19a0f2029c13db5a72560aca",
+      "anima/__init__.py": "c36aaebec91a4529d3ae932f5be53eda68e77c87372b70e6e3c96883f7b35422",
+      "anima/llm.py": "e5c5de715a3c12e0ba11f6e6e63e92b713ae6dc4fec09c76bfdbb13205e0a8bc",
+      "anima/cognition.py": "83e333ca6bee9e3e7168ec39faae1cf87a3a69eea3827311f287f08ed739c4e6",
+      "anima/capabilities.py": "1a2a0031344ff6690e74dc16e3f2cf46638ea4d11bf3ca7a6f96056c0c82c857",
+      "anima/agent.py": "eb7ee5f4834e219569a4f8471ea36b7c2d44a01d74d589fca76140af43eebba2",
+      "anima/sleep.py": "6ba2d309cf7debda6473dbe15818fbd8be6caa55c81cb642d80786ed941f9c7f",
+      "anima/__main__.py": "e50817e617608586b447ce7ec3c8071823abbfda924dc247861e60909a5cd853"
+    }
+  }
+}

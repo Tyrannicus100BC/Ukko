@@ -165,7 +165,7 @@ def run_sleep_cycle(cfg: Config, llm: Ollama, store: MemoryStore,
         for g in gists:
             store.remember("semantic", g,
                            importance=max(m.importance for m in cluster),
-                           source="sleep.consolidation", links=ids)
+                           source="sleep.consolidation", links=ids, epistemic="hypothesis")
             rep.gists.append(g)
         store.mark_consolidated(ids)
         rep.consolidated_episodics += len(ids)
@@ -187,7 +187,7 @@ def run_sleep_cycle(cfg: Config, llm: Ollama, store: MemoryStore,
             except LLMError:
                 insights = []
             for ins in insights:
-                store.remember("reflection", ins, importance=0.7,
+                store.remember("reflection", ins, importance=0.7, epistemic="hypothesis",
                                source="sleep.reflection",
                                links=[m.id for m in seeds[:6]])
                 rep.insights.append(ins)
@@ -214,7 +214,7 @@ def run_sleep_cycle(cfg: Config, llm: Ollama, store: MemoryStore,
             continue
         seed_ids = [m.id for m in seeds]
         did = store.remember("dream", dream, importance=0.35,
-                             source="sleep.rem", links=seed_ids)
+                             source="sleep.rem", links=seed_ids, epistemic="fiction")
         rep.dreams.append(dream)
         log("sleep.dream", {"dream": dream, "seeds": seed_ids})
         try:
@@ -228,7 +228,7 @@ def run_sleep_cycle(cfg: Config, llm: Ollama, store: MemoryStore,
                     and insight.lower() not in ("null", "none")
                     and "one sentence" not in insight.lower()):
                 store.remember("insight", insight, importance=0.6,
-                               source="sleep.rem.mining", links=[did])
+                               source="sleep.rem.mining", links=[did], epistemic="hypothesis")
                 rep.dream_insights.append(insight)
         except LLMError:
             pass

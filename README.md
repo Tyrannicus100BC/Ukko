@@ -1,164 +1,89 @@
-# Anima — an always-on AI agent with persistent long-term memory, sleep, and dreams (local LLM, zero dependencies)
+# Ukko
 
-**Anima is an open-source autonomous AI agent that runs 24/7 on your own machine, remembers everything across restarts, consolidates its memories while it sleeps, dreams, forgets on purpose, and maintains a persistent identity — all on a small local LLM (Ollama + a 2B-parameter model) with zero Python dependencies.**
+Ukko is an experiment in persistent, self-directed cognition on a local model. It starts from Anima and adds explicit attention competition: events and unanswered interests compete for consideration, neglect raises priority, and the model chooses its next topic. Human messages can receive a reply or silence.
 
-Unlike a chatbot, Anima is not request-response. It is a continuously running mind: it observes, thinks on its own heartbeat even when nobody is talking to it, speaks up proactively, sets its own goals, and sleeps when it gets tired. Kill the process and restart it a week later — the same individual wakes up, with its memories, its self-model, and its last dream intact.
+The target is Qwen3.8-27B on an M3 Ultra with 96 GB unified memory. The initial implementation keeps Anima's small Python package and browser interface. The experiment concerns behavioral continuity, attention and learning over time; generated descriptions of inner experience are observations to study.
 
-> **TL;DR:** persistent artificial identity is an *architecture* property, not a model-scale property. Anima proves it in ~1,700 lines of readable, dependency-free Python on an 8 GB laptop.
+## Design and review
 
-📄 **[Read the full design paper](docs/ANIMA_PAPER.md)** — architecture, memory mathematics, sleep algorithms, measured results, and lessons learned.
+- [Architecture](docs/UKKO_ARCHITECTURE.md) describes the implemented loop and the proposed memory, inference, tools and Discord design.
+- [Project review](docs/PROJECT_REVIEW.md) records the Anima findings and the Aura mechanisms worth investigating.
+- [Experiment plan](docs/EXPERIMENTS.md) defines comparisons and deployment milestones.
+- [Original Anima README](docs/ANIMA_UPSTREAM_README.md) and [design paper](docs/ANIMA_PAPER.md) preserve the starting project documentation.
 
----
+## What runs now
 
-## What can Anima do?
+With `experimental_attention` enabled, each cycle ingests percepts, ranks persistent candidates, asks the model to choose one, retrieves memories for that topic, and generates a thought and optional actions. It can add and resolve interests and request a consolidation sleep cycle. An invalid selection has a recorded controller fallback; failed thought generation leaves the candidate pending.
 
-- 🧠 **Human-like long-term memory for LLMs** — episodic, semantic, reflection, dream, and insight memories in SQLite, retrieved by *recency × importance × relevance* (the Generative Agents formulation), reinforced on every recall (the testing effect), and decayed on an Ebbinghaus forgetting curve whose stability grows with rehearsal and importance.
-- 🌙 **Sleep-time memory consolidation** — when fatigue accumulates and the user is idle, the agent enters a five-phase sleep cycle: salience tagging → NREM-style consolidation (episodes → semantic gists) → reflection → REM-style **dreaming** → synaptic-downscaling forgetting pass → self-model rewrite.
-- 💭 **Dreams that do work** — importance-weighted random memories are recombined into surreal narratives at high temperature, then mined for genuinely useful insights that join long-term memory. Generative replay, repurposed.
-- 🗑️ **Principled forgetting** — weak memories are archived (invisible but recoverable), then purged. Forgetting is a feature: it keeps retrieval sharp and identity coherent.
-- ⏰ **Always awake, adaptively** — an arousal-based heartbeat: fast ticks under stimulation, slowing toward minutes when idle (~12 generations/hour at steady state — sustainable on a laptop forever). Instant wake on new input.
-- 💬 **Proactive behavior** — it may speak first, report its dreams on waking, and set its own goals, with throttles that keep it companionable rather than noisy.
-- 🪪 **Identity that survives death** — a versioned self-model document, rewritten each sleep from lived experience only, loaded into every thought. The individual is the store, not the process.
-- 🔌 **100% local & private** — everything runs offline via the Ollama API. No cloud, no API keys, no telemetry. Your agent's memories never leave your machine.
+SQLite stores the attention candidates and decisions, memories with source and epistemic labels, and every subsequent self-model version. A checkpoint restores focus, working context and fatigue. The JSONL journal and existing web UI expose activity. Web reading and writing notes use Anima's existing capability settings.
 
-## Quick start (2 minutes)
+Discord text, Discord voice/video, direct activation steering, executable tool creation and architecture changes are planned. The current HTTP adapter generates text through a local MLX-compatible server; it does not alter activations.
 
-Requirements: Python 3.9+ (stdlib only — **no pip install**) and [Ollama](https://ollama.com) with a small chat model:
+## Local baseline
 
-```bash
-ollama pull gemma:2b            # or any small chat model you prefer
-git clone https://github.com/huodebing-alt/anima.git && cd anima
+Python 3.9+ is enough for the agent and offline checks. The inference server is a separate process.
 
-python3 -m anima run &          # the mind wakes up
-python3 -m anima ui             # → http://localhost:8765  (the web app)
-python3 -m anima talk           # …or chat in the terminal (--thoughts streams its inner monologue)
+For a small Ollama baseline, install the models explicitly:
+
+```sh
+ollama pull gemma:2b
+ollama pull nomic-embed-text
+python3 -m anima --config config/ukko.ollama.json run --max-ticks 10
 ```
 
-## The web UI
+Once the bounded run looks healthy, omit `--max-ticks` for continuous operation. The example configurations keep the wait between completed generations at 1–5 seconds. Actual cycle time also includes attention selection, retrieval and thought generation. Ollama uses `keep_alive=-1` to request residency. Sleep performs memory work using the resident model.
 
-`python3 -m anima ui` serves a modern local web app (pure stdlib server, no build step, nothing leaves your machine):
+Use the same configuration for every interface:
 
-- 💬 **Chat** with live streaming — plus **Mind** (watch it think in real time), **Dreams** (its dream journal), and **Memories** (inspect importance / strength / access counts of every memory).
-- 🎨 **Make it yours** — six color themes, dark & light mode, gradient-orb or emoji avatars, and a custom agent name (it genuinely adopts the name — the running mind hot-reloads its persona).
-- 🗣️ **Voice** — it speaks its replies aloud (pick any system voice, tune rate & pitch), you can dictate messages by mic, and an optional *ambient listening* mode turns overheard speech into percepts it remembers.
-- 👁️ **Camera watching** (opt-in) — motion in the room becomes percepts; add a multimodal Ollama model and it periodically *describes what it sees*.
-- 🔓 **Senses & powers, gated by you** — every capability is **off until you grant it** in Settings: internet browsing (it reads one page at a time, size-capped), and file creation confined to a single **workspace folder** you designate (path-traversal-proof, size-capped, and it watches that folder too — it notices what you drop there and what it creates itself).
-
-Camera, microphone, and speech all run on standard browser APIs behind the browser's own permission prompts — the Python side never touches your devices.
-
-
-
-Watch its life:
-
-```bash
-python3 -m anima status         # awake/asleep, fatigue, tick rate, memory counts
-python3 -m anima self           # its current self-model (identity document)
-python3 -m anima dreams         # the dream journal
-python3 -m anima memories       # inspect long-term memory (importance, strength, access)
-python3 -m anima control sleep  # force a sleep cycle right now
+```sh
+python3 -m anima --config config/ukko.ollama.json ui
+python3 -m anima --config config/ukko.ollama.json talk --thoughts
+python3 -m anima --config config/ukko.ollama.json attention
+python3 -m anima --config config/ukko.ollama.json status
+python3 -m anima --config config/ukko.ollama.json control stop
 ```
 
-Drop a text file into `runtime/watch/` and it will notice and remember.
+The UI opens at `http://localhost:8765`. Under Settings, change the human name and grant web reading or a workspace for notes if desired. The existing browser camera route uses an Ollama vision model; the MLX text adapter does not extend that route.
 
-## How it works
+## Qwen on Apple Silicon
 
-```
- sensors (inbox · clock · file watcher)
-      │ percepts
-      ▼
- ┌─ WAKING ─────────────────────────────────────────────┐
- │ reflex path:  user speaks → small pointed prompt →   │
- │               factual answer from retrieved memories │
- │ tick path:    situation = self-model + goals +       │
- │               retrieved memories + last dream +      │
- │               working memory → thought + action      │
- │ fatigue accumulates…                                 │
- └──────────────┬───────────────────────────────────────┘
-                ▼  sleep pressure ≥ 1 and user idle
- ┌─ SLEEP (interruptible) ──────────────────────────────┐
- │ 0 salience tagging   3 REM dreaming + insight mining │
- │ 1 NREM consolidation 4 decay & forgetting            │
- │ 2 reflection         5 self-model rewrite            │
- └──────────────┬───────────────────────────────────────┘
-                ▼
-        wakes and tells you what it dreamed
+For the installed Ollama model, use `config/ukko.qwen.ollama.json`. The first live trial used `qwen3.8:latest` (27.3B, Q4_K_M), `nomic-embed-text`, an 8192-token context and thinking disabled on the 32 GB development Mac:
+
+```sh
+python3 -m anima --config config/ukko.qwen.ollama.json run --max-ticks 10
 ```
 
-One process, one SQLite file, one small model. The entire mental state is inspectable with standard tools; the full stream of consciousness is an append-only JSONL journal.
+The trial has its own preserved runtime under `runtime/trials/`; `runtime/latest-trial.json` identifies its configuration. Use that configuration for the UI and any restart to continue the same subject. The reusable configuration above starts or continues the default `runtime/` subject.
 
-## How is Anima different from MemGPT / Letta, Mem0, Zep, or Generative Agents?
+In an isolated Python environment with MLX LM installed, a text baseline can use:
 
-| Capability | RAG / memory layers (MemGPT·Letta, Mem0, Zep, LangMem) | Generative Agents (Park et al.) | **Anima** |
-|---|---|---|---|
-| Persistent cross-session memory | ✅ | ✅ (in-sim) | ✅ |
-| Runs continuously without requests | ❌ reactive | ✅ (in-sim) | ✅ real daemon |
-| Retrieval reinforcement (testing effect) | ❌ | ❌ | ✅ |
-| Decay + true forgetting (Ebbinghaus) | partial (MemoryBank) | ❌ | ✅ archive → purge |
-| Offline consolidation (sleep) | Letta sleep-time compute (partial) | ❌ | ✅ five-phase cycle |
-| **Dreaming with insight mining** | ❌ | ❌ | ✅ |
-| Self-model identity document | ❌ | ❌ | ✅ versioned, self-rewritten |
-| Fatigue / circadian dynamics | ❌ | ❌ | ✅ |
-| Runs on 8 GB laptop, 2B model, no deps | varies | ❌ (GPT-3.5+) | ✅ |
-
-As of mid-2026 we know of no other open-source system that unifies an always-on cognitive loop, sleep consolidation, dreaming, and principled forgetting in one agent. (Survey with citations in the [paper](docs/ANIMA_PAPER.md) and [research digest](docs/related_work_digest.md).)
-
-## FAQ
-
-**Q: Does Anima require a GPU or a cloud API?**
-No. It targets a small open-weights model (default `gemma:2b`, 1.7 GB) through Ollama on CPU/Apple Silicon. It was built and verified on an 8 GB Apple M1 — while that machine was also running Xcode and a Vision Pro simulator.
-
-**Q: Can I use a bigger or different model?**
-Yes — set `ANIMA_MODEL=llama3.2:3b` (or anything Ollama serves). A separate `deep_model` slot can route the latency-insensitive sleep phases to a larger model while waking thought stays cheap.
-
-**Q: What happens when I kill the process?**
-Nothing is lost. Every memory, goal, dream, and self-model version is written through to SQLite at the moment it exists. On restart the agent journals "reboot: memory intact" and resumes — in our tests it answered questions about facts learned before the kill, and resumed its pre-death dream as its current focus.
-
-**Q: How does the agent decide what to forget?**
-During sleep, every memory's strength decays exponentially; stability grows with access count and importance, so what the mind uses, it keeps. Below a threshold, memories are archived (soft forget) and later purged (hard forget). Deterministic unit tests verify the whole curve.
-
-**Q: Is this AGI / is it conscious?**
-No claim of phenomenal consciousness. "Consistent consciousness" here is an engineering target: behavioral and narrative continuity of one individual over unbounded time. The design paper is explicit about what the 2B substrate can and cannot carry.
-
-**Q: Is it safe to leave running?**
-The default action surface is deliberately tiny: speak, remember, set goals. Internet browsing and file creation exist but are **off until you grant them** in the UI, are throttled and size-capped, and file writes are confined to one workspace folder you choose. There is no shell access. Everything it does is auditable in `runtime/journal.jsonl`.
-
-**Q: How is it tested?**
-17 deterministic unit tests for the memory mathematics (no LLM needed) plus a 14-check live integration test that drives a real daemon through boot → idle thinking → conversation → sleep/dream → process death → resurrection-with-recall. Latest run: **14/14 passing**.
-
-## Project layout
-
-```
-anima/            the package (pure stdlib Python)
-  agent.py        the Mind: heartbeat, arousal, fatigue, wake/sleep state machine
-  cognition.py    waking thought: reflex replies + contemplative ticks
-  sleep.py        consolidation, reflection, dreams, forgetting, self-model
-  store.py        SQLite long-term memory: scoring, reinforcement, decay
-  sensors.py      perception: user inbox, clock, watched folder
-  capabilities.py gated powers: bounded web browsing + workspace file writes
-  llm.py          minimal Ollama client (chat, JSON mode, embeddings)
-  server.py       the web UI server: JSON API + SSE stream (stdlib http.server)
-  config.py       every timescale is tunable — a whole life can run in minutes
-ui/               the web app (vanilla HTML/CSS/JS, no build step)
-tests/            17 unit tests + full life-cycle integration test
-docs/             design paper + related-work research digest
+```sh
+mlx_lm.server --model mlx-community/Qwen3.8-27B-4bit --host 127.0.0.1 --port 8080
 ```
 
-## Keywords
+Keep Ollama running with `nomic-embed-text` installed for the separate embedding lane, then run:
 
-LLM long-term memory · AI agent memory · sleep-time compute · memory consolidation · dreaming AI · Ebbinghaus forgetting curve · generative agents · autonomous agent · ambient agent · local LLM · Ollama · gemma · persistent AI identity · artificial consciousness · continual learning · hippocampal replay · complementary learning systems · MemGPT alternative · self-hosted AI companion
-
-## Citation
-
-```bibtex
-@misc{anima2026,
-  title  = {Anima: An Always-Awake Agent with Human-Like Memory, Sleep, and
-            Dreams on a Small Local Language Model},
-  year   = {2026},
-  url    = {https://github.com/huodebing-alt/anima},
-  note   = {Design paper: docs/ANIMA_PAPER.md}
-}
+```sh
+python3 -m anima --config config/ukko.mlx.json run --max-ticks 10
 ```
 
-## License
+The [MLX server documentation](https://github.com/ml-explore/mlx-lm/blob/main/mlx_lm/SERVER.md) defines the API. The [4-bit model card](https://huggingface.co/mlx-community/Qwen3.8-27B-4bit) documents the converted checkpoint. The adapter sends `chat_template_kwargs.enable_thinking=false` for short JSON cycles; a recent server must support this field. HTTP JSON uses prompts and parsing, so measure parsing failures before longer runs. `context_tokens` controls Ollama only; the MLX deployment must configure its own cache and context limits.
 
-MIT — see [LICENSE](LICENSE).
+The supplied configurations use the same default `runtime/` directory. Give each comparison a separate `ANIMA_RUNTIME_DIR` and `ANIMA_WATCH_DIR`. Keep one embedding model fixed within each runtime; changing its vectors requires reindexing. Run one mind process per runtime. `ANIMA_EXPERIMENTAL_ATTENTION=false` retains Anima's original reflex and contemplative loop for a comparison, while the memory correctness fixes apply to both modes.
+
+## Verification
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 -m experiments.attention_probe --output experiments/results/attention_probe.json
+```
+
+The suite has 34 passing offline tests, including restart, discretionary replies, HTTP contracts, schema migration, forgetting consistency and stopped-run status. The scheduler probe uses synthetic stimuli and no model. With aging enabled, it visits 19 of 19 interests during 720 decisions; with aging disabled it visits 0. See [the result](experiments/results/attention_probe.json).
+
+The first bounded Ollama trial is recorded in [the live trial report](docs/LIVE_TRIAL.md). Activation effects, prolonged behavior and performance on the 96 GB target remain unmeasured.
+
+## Provenance
+
+Anima was cloned into this folder at `ba215ce72bcaedd147d5d08de6e54555a62952c1`. Its MIT license and notices remain in [LICENSE](LICENSE). The Git remote still points to Anima; no remote changes have been published.
+
+Aura was cloned only for review under the ignored `.references/aura/` directory at `f7fbfe4e17019fa28b0abca40dc9bd0001b853b0`. Its [license](https://github.com/youngbryan97/aura/blob/f7fbfe4e17019fa28b0abca40dc9bd0001b853b0/LICENSE) permits reading and learning but prohibits code reuse and derivative works. Ukko does not import or vendor Aura code. Activation-steering experiments will use an independent implementation of published methods.

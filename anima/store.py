@@ -73,6 +73,12 @@ CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS self_model_history (
+    version INTEGER PRIMARY KEY,
+    text TEXT NOT NULL,
+    updated_ts REAL NOT NULL
+);
 """
 
 
@@ -91,6 +97,7 @@ class Memory:
     links: list[int] = field(default_factory=list)
     consolidated: bool = False
     score: float = 0.0  # transient: last retrieval score
+    epistemic: str = "unclassified"
 
 
 def _pack(vec: Optional[Iterable[float]]) -> Optional[bytes]:
@@ -127,6 +134,16 @@ class MemoryStore:
         self.db = sqlite3.connect(str(db_path))
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
+        columns = {r["name"] for r in self.db.execute("PRAGMA table_info(memories)")}
+        if "last_decay_ts" not in columns:
+            self.db.execute("ALTER TABLE memories ADD COLUMN last_decay_ts REAL")
+            # Existing strengths already include the old decay passes.
+            self.db.execute("UPDATE memories SET last_decay_ts=?", (now_fn(),))
+        if "epistemic" not in columns:
+            self.db.execute("ALTER TABLE memories ADD COLUMN epistemic TEXT"
+                            " NOT NULL DEFAULT 'unclassified'")
+        self.db.execute("INSERT OR IGNORE INTO self_model_history"
+                        " SELECT version, text, updated_ts FROM self_model")
         self.db.commit()
         self.embed_fn = embed_fn
         self.now = now_fn
@@ -144,22 +161,27 @@ class MemoryStore:
             access_count=r["access_count"], importance=r["importance"],
             strength=r["strength"], source=r["source"],
             links=json.loads(r["links"]), consolidated=bool(r["consolidated"]),
+            epistemic=r["epistemic"],
         )
 
     # -- encode ----------------------------------------------------------
     def remember(self, kind: str, text: str, *, importance: float = 0.3,
                  source: str = "", links: Optional[list[int]] = None,
-                 embed: bool = True, dedup_sim: float = 0.97) -> int:
+                 embed: bool = True, dedup_sim: float = 0.97,
+                 epistemic: str = "unclassified") -> int:
         """Insert a memory — unless a near-identical one already exists, in
         which case repetition reinforces the original instead of duplicating
         it (rehearsal, not hoarding)."""
         assert kind in KINDS, kind
+        if epistemic not in ("unclassified", "observation", "hypothesis", "fiction"):
+            raise ValueError("invalid epistemic status")
         now = self.now()
         raw_vec = self.embed_fn(text) if embed else None
         if raw_vec is not None and dedup_sim < 1.0:
             for r in self.db.execute(
                     "SELECT id, embedding, importance FROM memories"
-                    " WHERE kind=? AND archived_ts IS NULL", (kind,)):
+                    " WHERE kind=? AND epistemic=? AND source=?"
+                    " AND archived_ts IS NULL", (kind, epistemic, source)):
                 old = _unpack(r["embedding"])
                 if old and cosine(raw_vec, old) >= dedup_sim:
                     self.db.execute(
@@ -172,10 +194,10 @@ class MemoryStore:
         vec = _pack(raw_vec) if raw_vec is not None else None
         cur = self.db.execute(
             "INSERT INTO memories (kind, text, embedding, created_ts,"
-            " last_access_ts, importance, strength, source, links)"
-            " VALUES (?,?,?,?,?,?,1.0,?,?)",
+            " last_access_ts, importance, strength, source, links, last_decay_ts, epistemic)"
+            " VALUES (?,?,?,?,?,?,1.0,?,?,?,?)",
             (kind, text, vec, now, now, max(0.0, min(1.0, importance)),
-             source, json.dumps(links or [])))
+             source, json.dumps(links or []), now, epistemic))
         self.db.commit()
         return int(cur.lastrowid)
 
@@ -189,7 +211,7 @@ class MemoryStore:
         qvec = self.embed_fn(query)
         now = self.now()
         rows = self.db.execute(
-            "SELECT * FROM memories WHERE archived_ts IS NULL"
+            "SELECT * FROM memories WHERE archived_ts IS NULL AND epistemic != 'fiction'"
             + (" AND kind IN (%s)" % ",".join("?" * len(kinds)) if kinds else ""),
             tuple(kinds) if kinds else ()).fetchall()
         scored: list[Memory] = []
@@ -259,19 +281,21 @@ class MemoryStore:
         decayed = archived = 0
         for r in self.db.execute(
                 "SELECT id, last_access_ts, access_count, importance, strength,"
-                " kind, consolidated FROM memories WHERE archived_ts IS NULL"):
-            days = max(0.0, now - r["last_access_ts"]) / 86400.0
+                " kind, consolidated, last_decay_ts FROM memories WHERE archived_ts IS NULL"):
+            start = max(r["last_access_ts"], r["last_decay_ts"] or r["last_access_ts"])
+            days = max(0.0, now - start) / 86400.0
             stability = 1.0 + stability_access * r["access_count"] \
                 + stability_importance * r["importance"]
             # consolidated episodics fade faster: their gist lives elsewhere
             lam = decay_lambda * (1.6 if (r["kind"] == "episodic" and r["consolidated"]) else 1.0)
             s = r["strength"] * math.exp(-lam * days / stability)
             if s < archive_threshold:
-                self.db.execute("UPDATE memories SET strength=?, archived_ts=? WHERE id=?",
-                                (s, now, r["id"]))
+                self.db.execute("UPDATE memories SET strength=?, archived_ts=?,"
+                                " last_decay_ts=? WHERE id=?", (s, now, now, r["id"]))
                 archived += 1
             else:
-                self.db.execute("UPDATE memories SET strength=? WHERE id=?", (s, r["id"]))
+                self.db.execute("UPDATE memories SET strength=?, last_decay_ts=? WHERE id=?",
+                                (s, max(now, start), r["id"]))
                 decayed += 1
         purged = self.db.execute(
             "DELETE FROM memories WHERE archived_ts IS NOT NULL AND archived_ts < ?",
@@ -295,6 +319,8 @@ class MemoryStore:
             "INSERT INTO self_model (id, text, version, updated_ts) VALUES (1,?,?,?)"
             " ON CONFLICT(id) DO UPDATE SET text=?, version=?, updated_ts=?",
             (text, v + 1, self.now(), text, v + 1, self.now()))
+        self.db.execute("INSERT INTO self_model_history VALUES (?,?,?)",
+                        (v + 1, text, self.now()))
         self.db.commit()
         return v + 1
 

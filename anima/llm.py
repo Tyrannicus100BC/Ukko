@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import time
 import urllib.error
 import urllib.request
 from typing import Any
@@ -13,7 +14,8 @@ class LLMError(RuntimeError):
 
 class Ollama:
     def __init__(self, base_url: str, model: str, embed_model: str = "",
-                 timeout_s: float = 120.0, keep_alive: str = "2h"):
+                 timeout_s: float = 120.0, keep_alive: str = "2h",
+                 context_tokens: int = 8192, think: bool = False):
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.embed_model = embed_model or model
@@ -21,7 +23,11 @@ class Ollama:
         # an always-on mind must keep its substrate resident: without this,
         # Ollama unloads the model between quiet ticks and every wake-up pays
         # a ~40s reload on a memory-pressured machine
-        self.keep_alive = keep_alive
+        # Ollama accepts a negative number for indefinite residency; the
+        # string "-1" is parsed as a duration and rejected for lacking a unit.
+        self.keep_alive = -1 if keep_alive == "-1" else keep_alive
+        self.context_tokens, self.think = context_tokens, think
+        self.last_generation: dict = {}
 
     # ------------------------------------------------------------------
     def _post(self, path: str, payload: dict) -> dict:
@@ -33,6 +39,9 @@ class Ollama:
         try:
             with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
                 return json.loads(resp.read().decode())
+        except urllib.error.HTTPError as e:
+            detail = e.read(2000).decode("utf-8", errors="replace")
+            raise LLMError(f"ollama {path}: HTTP {e.code}: {detail}") from e
         except (urllib.error.URLError, OSError, json.JSONDecodeError) as e:
             raise LLMError(f"ollama {path}: {e}") from e
 
@@ -48,11 +57,20 @@ class Ollama:
             ],
             "stream": False,
             "keep_alive": self.keep_alive,
-            "options": {"temperature": temperature, "num_predict": max_tokens},
+            "think": self.think,
+            "options": {"temperature": temperature, "num_predict": max_tokens,
+                        "num_ctx": self.context_tokens},
         }
         if json_mode:
             payload["format"] = "json"
+        start = time.monotonic()
         out = self._post("/api/chat", payload)
+        if out.get("error"):
+            raise LLMError(str(out["error"]))
+        self.last_generation = {"backend": "ollama", "model": out.get("model", model or self.model),
+                                "wall_s": time.monotonic() - start,
+                                "prompt_tokens": out.get("prompt_eval_count"),
+                                "completion_tokens": out.get("eval_count")}
         return (out.get("message") or {}).get("content", "")
 
     @staticmethod
@@ -84,10 +102,19 @@ class Ollama:
                   retries: int = 1) -> dict:
         """Chat with JSON grammar enforcement; lenient parse, then retry."""
         last = ""
+        attempts = []
         for _ in range(retries + 1):
-            last = self.chat(system, user, model=model, json_mode=True,
-                             temperature=temperature, max_tokens=max_tokens)
+            started = time.monotonic()
+            try:
+                last = self.chat(system, user, model=model, json_mode=True,
+                                 temperature=temperature, max_tokens=max_tokens)
+            except LLMError as e:
+                attempts.append({"error": str(e), "wall_s": time.monotonic() - started})
+                self.last_generation = {"json_attempts": attempts}
+                raise
             obj = self._parse_json_lenient(last)
+            attempts.append({**self.last_generation, "parsed": obj is not None})
+            self.last_generation = {**self.last_generation, "json_attempts": list(attempts)}
             if obj is not None:
                 return obj
         raise LLMError(f"unparseable JSON from model: {last[:200]!r}")
@@ -108,3 +135,64 @@ class Ollama:
                 return True
         except (urllib.error.URLError, OSError):
             return False
+
+
+class LocalHTTP(Ollama):
+    """Text generation through a local MLX-compatible HTTP server.
+
+    Embeddings stay on a separate Ollama lane. JSON output uses prompting
+    and parsing here, rather than claiming a server-side grammar guarantee.
+    Activation steering needs an in-process worker and is not exposed here.
+    """
+    def __init__(self, base_url: str, model: str, embeddings: Ollama,
+                 timeout_s: float = 180.0, think: bool = False):
+        super().__init__(base_url, model, timeout_s=timeout_s)
+        self.embeddings = embeddings
+        self.think = think
+
+    def chat(self, system: str, user: str, *, model: str = "",
+             json_mode: bool = False, temperature: float = 0.8,
+             max_tokens: int = 512) -> str:
+        if json_mode:
+            system += "\nReturn exactly one JSON object without Markdown fences."
+        start = time.monotonic()
+        out = self._post("/chat/completions", {
+            "model": model or self.model,
+            "messages": [{"role": "system", "content": system},
+                         {"role": "user", "content": user}],
+            "temperature": temperature, "max_tokens": max_tokens, "stream": False,
+            "chat_template_kwargs": {"enable_thinking": self.think},
+        })
+        choices = out.get("choices") or []
+        if not choices:
+            raise LLMError(f"local inference returned no choices: {out.get('error')}")
+        content = (choices[0].get("message") or {}).get("content")
+        if not isinstance(content, str) or not content.strip():
+            raise LLMError("local inference returned no text content")
+        self.last_generation = {"backend": "local_http", "model": out.get("model", model or self.model),
+                                "wall_s": time.monotonic() - start,
+                                "finish_reason": choices[0].get("finish_reason"),
+                                "usage": out.get("usage")}
+        return content
+
+    def embed(self, text: str) -> list[float]:
+        return self.embeddings.embed(text)
+
+    def alive(self) -> bool:
+        try:
+            with urllib.request.urlopen(self.base_url + "/models", timeout=5):
+                return True
+        except (urllib.error.URLError, OSError):
+            return False
+
+
+def make_llm(cfg) -> Ollama:
+    embeddings = Ollama(cfg.ollama_url, cfg.model, cfg.embed_model,
+                        cfg.llm_timeout_s, cfg.keep_alive, cfg.context_tokens, cfg.think)
+    if cfg.inference_backend == "ollama":
+        return embeddings
+    if cfg.inference_backend == "local_http":
+        if not cfg.embed_model:
+            raise ValueError("local_http requires an explicit Ollama embed_model")
+        return LocalHTTP(cfg.inference_url, cfg.model, embeddings, cfg.llm_timeout_s, cfg.think)
+    raise ValueError(f"unknown inference_backend: {cfg.inference_backend}")
